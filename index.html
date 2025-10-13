@@ -228,9 +228,9 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
+    <!-- <script>
 
-        const API_URL = 'https://earthquakeapi-rdtd.onrender.com/api/earthquakes';
+        const API_URL = 'http://localhost:3000/api/earthquakes';
 
         function magnitudeToColor(m, ageDays) {
             const baseColor =
@@ -320,7 +320,7 @@
                 circle.bindPopup(`<div>${label}</div>`);
 
                 const li = document.createElement('li');
-                li.innerHTML = `<span class="mag">⚠️ ${mag}</span> <span>${place || 'Unknown, Philippines'}</span><div class="small">${date}</div>`;
+                li.innerHTML = `<span class="mag">${mag}</span> <span>${place || 'Unknown, Philippines'}</span><div class="small">${date}</div>`;
                 li.style.cursor = 'pointer';
                 li.addEventListener('click', () => {
                     map.setView([lat, lon], 8);
@@ -360,7 +360,160 @@
                 sidebar.removeEventListener('transitionend', handler);
             });
         });
+    </script> -->
+    <script>
+        const API_URL = 'http://localhost:3000/api/earthquakes';
+
+        function magnitudeToColor(m, ageDays) {
+            const baseColor =
+                m >= 7 ? '#800026' :
+                    m >= 6 ? '#BD0026' :
+                        m >= 5 ? '#E31A1C' :
+                            m >= 4 ? '#FC4E2A' :
+                                m >= 3 ? '#FD8D3C' :
+                                    m >= 2 ? '#FEB24C' :
+                                        '#FED976';
+            const opacityFactor = Math.max(0.3, 1 - ageDays / 30);
+            return { color: baseColor, opacity: opacityFactor };
+        }
+
+        function magToRadiusMeters(m) {
+            return Math.max(150, Math.pow(m, 2) * 300);
+        }
+
+        // Remove prefixes like "123 km N 45° E of " from place names
+        function cleanPlace(place) {
+            if (!place) return 'Unknown, Philippines';
+            // Remove everything up to the last " of "
+            const index = place.toLowerCase().lastIndexOf(' of ');
+            if (index === -1) return place.trim(); // no "of", return as is
+            return place.slice(index + 4).trim(); // everything after " of "
+        }
+
+
+        const map = L.map('map', { center: [12.8797, 121.774], zoom: 6 });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        const markerLayer = L.layerGroup().addTo(map);
+
+        const statusEl = document.getElementById('status');
+        const eventsEl = document.getElementById('events');
+        const countEl = document.getElementById('count');
+        const loadingEl = document.getElementById('loading');
+
+        let earthquakeData = [];
+
+        async function fetchData() {
+            loadingEl.style.display = 'inline-block';
+            statusEl.textContent = 'Fetching data...';
+            try {
+                const res = await fetch(API_URL);
+                if (!res.ok) throw new Error('Network error');
+                const j = await res.json();
+
+                earthquakeData = (j.earthquakes || []).filter(ev => ev.lat && ev.lon);
+
+                statusEl.textContent = `Loaded ${earthquakeData.length} events (last 30 days + previous month)`;
+                updateDisplay();
+            } catch (err) {
+                console.error(err);
+                statusEl.textContent = 'Failed to fetch earthquake data';
+                earthquakeData = [];
+                updateDisplay();
+            } finally {
+                loadingEl.style.display = 'none';
+            }
+        }
+
+        function clearMarkers() {
+            markerLayer.clearLayers();
+        }
+
+        function updateDisplay() {
+            const minMag = parseFloat(document.getElementById('minMag').value) || 0;
+            document.getElementById('minMagLabel').textContent = minMag.toFixed(1);
+
+            clearMarkers();
+            eventsEl.innerHTML = '';
+
+            const visible = earthquakeData.filter(ev => ev.mag >= minMag);
+            countEl.textContent = visible.length;
+
+            const latlngs = [];
+            const now = Date.now();
+
+            visible.forEach(ev => {
+                const { lat, lon, mag, place: rawPlace, date } = ev;
+                const place = cleanPlace(rawPlace);
+
+                const ageDays = 0;
+                const { color, opacity } = magnitudeToColor(mag, ageDays);
+                const radius = magToRadiusMeters(mag);
+
+                const circle = L.circle([lat, lon], {
+                    radius,
+                    color,
+                    weight: 1,
+                    fillOpacity: opacity
+                }).addTo(markerLayer);
+
+                const label = `${place}<br/>Mag: ${mag} ⚠️<br/>Date: ${date}`;
+                circle.bindPopup(`<div>${label}</div>`);
+
+                // Determine ⚠️ and color
+                const showWarning = mag >= 5 ? '⚠️ ' : '';
+                // Red intensity based on magnitude (5 → light red, 7+ → dark red)
+                const redIntensity = Math.min(255, 100 + (mag - 5) * 75);
+                const magColor = mag >= 5 ? `rgb(${redIntensity},0,0)` : '#111';
+
+                const li = document.createElement('li');
+                li.innerHTML = `<span class="mag" style="color:${magColor}">${showWarning}${mag}</span> <span style="color:${magColor}">${place}</span><div class="small">${date}</div>`;
+                li.style.cursor = 'pointer';
+                li.addEventListener('click', () => {
+                    map.setView([lat, lon], 8);
+                    circle.openPopup();
+                });
+                eventsEl.appendChild(li);
+
+                latlngs.push([lat, lon]);
+            });
+
+            if (latlngs.length) {
+                try {
+                    map.fitBounds(latlngs, { padding: [40, 40], maxZoom: 9 });
+                } catch (e) {
+                    console.warn('fitBounds failed', e);
+                }
+            }
+        }
+
+        // Min magnitude filter
+        document.getElementById('minMag').addEventListener('input', updateDisplay);
+
+        // Fetch every 5 minutes
+        fetchData();
+        setInterval(fetchData, 5 * 60 * 1000);
+
+        // Sidebar toggle functionality
+        const toggleBtn = document.getElementById('toggleSidebar');
+        const appContainer = document.getElementById('app');
+        const sidebar = document.querySelector('aside');
+
+        toggleBtn.addEventListener('click', () => {
+            const isCollapsed = appContainer.classList.toggle('sidebar-collapsed');
+            toggleBtn.textContent = isCollapsed ? '☰' : '×';
+
+            // Wait for CSS transition to complete, then rerender the map
+            sidebar.addEventListener('transitionend', function handler() {
+                map.invalidateSize();
+                sidebar.removeEventListener('transitionend', handler);
+            });
+        });
     </script>
+
+
 </body>
 
 </html>
