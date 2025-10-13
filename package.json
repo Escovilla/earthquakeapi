@@ -1,29 +1,32 @@
 {
-  "name": "phivolcs-earthquake-api",
-  "version": "1.0.0",
-  "description": "🟠 REST API that fetches and returns live earthquake data from PHIVOLCS in JSON format.",
-  "main": "server/index.js",
-  "type": "commonjs",
-  "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
-  },
-  "keywords": [
-    "earthquake",
-    "phivolcs",
-    "rest-api",
-    "express",
-    "scraper",
-    "json"
-  ],
-  "license": "MIT",
-  "dependencies": {
-    "axios": "^1.7.2",
-    "cheerio": "^1.0.0",
-    "cors": "^2.8.5",
-    "express": "^4.19.2"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.0"
-  }
+	"name": "phivolcs-earthquake-api",
+	"version": "1.0.0",
+	"description": "🟠 REST API that fetches and returns live earthquake data from PHIVOLCS in JSON format.",
+	"main": "server/index.js",
+	"type": "commonjs",
+	"scripts": {
+		"start": "node index.js",
+		"build": "babel src -d dist"
+	},
+	"keywords": [
+		"earthquake",
+		"phivolcs",
+		"rest-api",
+		"express",
+		"scraper",
+		"json"
+	],
+	"license": "MIT",
+	"dependencies": {
+		"axios": "^1.7.2",
+		"cheerio": "^1.0.0",
+		"cors": "^2.8.5",
+		"express": "^4.19.2"
+	},
+	"devDependencies": {
+		"@babel/cli": "^7.28.3",
+		"@babel/core": "^7.28.4",
+		"@babel/preset-env": "^7.28.3",
+		"nodemon": "^3.1.0"
+	}
 }
